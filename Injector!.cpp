@@ -1,7 +1,9 @@
-#include "iostream"
+#include <iostream>
 #include <Windows.h>
 #include <TlHelp32.h>
 #include <string>
+#include <vector>
+#include <limits>
 
 bool InjectDLL(const std::string& processName, const std::string& dllPath) {
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -81,12 +83,45 @@ bool InjectDLL(const std::string& processName, const std::string& dllPath) {
 }
 
 int main() {
-    std::string processName;
+    std::vector<std::string> processList;
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnapshot == INVALID_HANDLE_VALUE) {
+        std::cerr << "Failed to create process snapshot!" << std::endl;
+        return 1;
+    }
+
+    PROCESSENTRY32 pe32;
+    pe32.dwSize = sizeof(PROCESSENTRY32);
+    if (Process32First(hSnapshot, &pe32)) {
+        do {
+            processList.push_back(pe32.szExeFile);
+        } while (Process32Next(hSnapshot, &pe32));
+    }
+    CloseHandle(hSnapshot);
+
+    if (processList.empty()) {
+        std::cerr << "No processes found!" << std::endl;
+        return 1;
+    }
+
+    std::cout << "Select a process to inject into:" << std::endl;
+    for (size_t i = 0; i < processList.size(); ++i) {
+        std::cout << i + 1 << ". " << processList[i] << std::endl;
+    }
+
+    size_t choice = 0;
+    std::cout << "Enter the number of the process: ";
+    std::cin >> choice;
+    std::cin.clear();
+    std::cin.ignore((std::numeric_limits<std::streamsize>::max)(), '\n');
+
+    if (choice < 1 || choice > processList.size()) {
+        std::cerr << "Invalid choice!" << std::endl;
+        return 1;
+    }
+
+    std::string processName = processList[choice - 1];
     std::string dllPath;
-
-    std::cout << "Enter the name of the process to inject into (e.g., skid.exe): ";
-    std::getline(std::cin, processName);
-
     std::cout << "Enter the full path of the DLL to inject: ";
     std::getline(std::cin, dllPath);
 
@@ -94,4 +129,3 @@ int main() {
 
     return 0;
 }
-
